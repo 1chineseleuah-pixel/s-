@@ -14,9 +14,10 @@ const client = new Client({
 client.lavalink = new Manager({
     nodes: [
         {
-            host: "localhost",
-            port: 2333,
-            authorization: "youshallnotpass", // Default Lavalink password
+            host: "lavalink.devamop.in",
+            port: 443,
+            authorization: "devamop.in",
+            secure: true
         }
     ],
     send: (guildId, packet) => {
