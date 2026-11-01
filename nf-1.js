@@ -110,21 +110,9 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
         console.log('Successfully registered application commands.');
     } catch (error) {
-        console.error(error);
-    }
+    console.error(error);
+  }
 })();
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
-});
-
-client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-});
 
 client.on('messageCreate', message => {
   if (message.content === '!ping') {
