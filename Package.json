@@ -1,9 +1,10 @@
 {
   "name": "discord-music-bot",
   "version": "1.0.0",
-  "main": "sŁя.js",
+  "description": "Discord Music Bot",
+  "main": "index.js",
   "scripts": {
-    "start": "node sŁя.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
