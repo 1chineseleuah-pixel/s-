@@ -1,0 +1,115 @@
+require('dotenv').config();
+const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
+const { Manager } = require('lavalink-client');
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessages
+    ]
+});
+
+// Initialize Lavalink Manager for multi-source audio handling
+client.lavalink = new Manager({
+    nodes: [
+        {
+            host: "localhost",
+            port: 2333,
+            authorization: "youshallnotpass", // Default Lavalink password
+        }
+    ],
+    send: (guildId, packet) => {
+        const guild = client.guilds.cache.get(guildId);
+        if (guild) guild.shard.send(packet);
+    },
+    defaultSearchEngine: "ytsearch",
+    client: client.user?.id
+});
+
+client.on("raw", (packet) => client.lavalink.sendRawPayload(packet));
+
+client.once('ready', () => {
+    console.log(`Logged in as ${client.user.tag}!`);
+    client.lavalink.init(client.user.id);
+});
+
+// Slash Command Registration
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const { commandName, options, guildId, member } = interaction;
+
+    if (commandName === 'play') {
+        const query = options.getString('query');
+        const voiceChannel = member.voice.channel;
+
+        if (!voiceChannel) {
+            return interaction.reply({ content: '❌ You need to be in a voice channel first!', ephemeral: true });
+        }
+
+        await interaction.deferReply();
+
+        try {
+            // Get or create player for multiple voice channel support per cluster
+            let player = client.lavalink.getPlayer(guildId);
+
+            if (!player) {
+                player = client.lavalink.createPlayer({
+                    guildId: guildId,
+                    voiceChannel: voiceChannel.id,
+                    textChannel: interaction.channel.id,
+                    selfDeaf: true,
+                });
+                await player.connect();
+            }
+
+            const res = await player.search({ query: query }, interaction.user);
+
+            if (!res.tracks.length) {
+                return interaction.editReply('❌ No results found for your query.');
+            }
+
+            if (res.loadType === "playlist") {
+                for (const track of res.tracks) {
+                    player.queue.add(track);
+                }
+                await interaction.editReply(`🎶 Added playlist: **${res.playlist.name}** (${res.tracks.length} tracks)`);
+            } else {
+                player.queue.add(res.tracks[0]);
+                await interaction.editReply(`🎶 Added to queue: **${res.tracks[0].title}**`);
+            }
+
+            if (!player.playing && !player.paused) {
+                await player.play();
+            }
+
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply('❌ An error occurred while trying to play the song.');
+        }
+    }
+});
+
+// Register commands to Discord
+const commands = [
+    new SlashCommandBuilder()
+        .setName('play')
+        .setDescription('Plays a song from any major link or search query')
+        .addStringOption(option =>
+            option.setName('query')
+                .setDescription('Song name, YouTube, SoundCloud, or supported audio URL')
+                .setRequired(true))
+].map(command => command.toJSON());
+
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+(async () => {
+    try {
+        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
+        console.log('Successfully registered application commands.');
+    } catch (error) {
+        console.error(error);
+    }
+})();
+
+client.login(process.env.DISCORD_TOKEN);
