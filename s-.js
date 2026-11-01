@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
-const { Manager } = require('lavalink-client');
+const { LavalinkManager } = require("lavalink-client");
 
 const client = new Client({
     intents: [
@@ -10,32 +10,33 @@ const client = new Client({
     ]
 });
 
-// Initialize Lavalink Manager for multi-source audio handling
-client.lavalink = new Manager({
+// Initialize Lavalink Manager with active public node
+client.lavalink = new LavalinkManager({
     nodes: [
         {
-            host: "lavalink.devamop.in",
+            host: "lava-v4.ajiedev.id",
             port: 443,
-            authorization: "devamop.in",
+            authorization: "https://discord.gg/ajiedev",
             secure: true
         }
     ],
-    send: (guildId, packet) => {
+    sendToShard: (guildId, payload) => {
         const guild = client.guilds.cache.get(guildId);
-        if (guild) guild.shard.send(packet);
+        if (guild) guild.shard.send(payload);
     },
-    defaultSearchEngine: "ytsearch",
-    client: client.user?.id
+    client: {
+        id: process.env.CLIENT_ID
+    }
 });
 
 client.on("raw", (packet) => client.lavalink.sendRawPayload(packet));
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
-    client.lavalink.init(client.user.id);
+    client.lavalink.init({ id: client.user.id });
 });
 
-// Slash Command Registration
+// Slash Command Handling
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -52,14 +53,13 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.deferReply();
 
         try {
-            // Get or create player for multiple voice channel support per cluster
             let player = client.lavalink.getPlayer(guildId);
 
             if (!player) {
                 player = client.lavalink.createPlayer({
                     guildId: guildId,
-                    voiceChannel: voiceChannel.id,
-                    textChannel: interaction.channel.id,
+                    voiceChannelId: voiceChannel.id,
+                    textChannelId: interaction.channel.id,
                     selfDeaf: true,
                 });
                 await player.connect();
@@ -67,7 +67,7 @@ client.on('interactionCreate', async (interaction) => {
 
             const res = await player.search({ query: query }, interaction.user);
 
-            if (!res.tracks.length) {
+            if (!res || !res.tracks.length) {
                 return interaction.editReply('❌ No results found for your query.');
             }
 
@@ -92,7 +92,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// Register commands to Discord
+// Register slash commands to Discord
 const commands = [
     new SlashCommandBuilder()
         .setName('play')
@@ -104,6 +104,7 @@ const commands = [
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
 (async () => {
     try {
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
