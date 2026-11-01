@@ -1,0 +1,13 @@
+{
+  "name": "discord-music-bot",
+  "version": "1.0.0",
+  "main": "sŁя.js",
+  "scripts": {
+    "start": "node sŁя.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "lavalink-client": "^2.1.0"
+  }
+}
